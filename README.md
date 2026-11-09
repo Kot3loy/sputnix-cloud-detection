@@ -82,18 +82,19 @@
 обученные примеры в rejected_examples/ — просто открываются двойным кликом.
 
 ### Проверка алгоритма вживую
-Нужен Python 3.10+ (python.org, при установке отметить "Add to PATH").
-Один раз — установка библиотек (при наличии NVIDIA GPU — первый вариант,
-без GPU — второй, инференс просто медленнее):
+
+Нужен Python 3.10+ (python.org, галочка "Add to PATH"). Дальше — два клика:
+
+1. **`УСТАНОВКА.bat`** — сам найдёт Python, создаст окружение и поставит
+   библиотеки (спросит: CPU ~300 МБ или GPU ~3 ГБ)
+2. **`ЗАПУСК_ПРОГРАММЫ.bat`** — откроет графический интерфейс
+
+Вручную то же самое:
 
     python -m venv .venv
     .venv\Scripts\activate
     pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128   :: GPU
     pip install -r requirements.txt                                                     :: CPU (~300 МБ)
-
-Дальше — двойной клик по `ЗАПУСК_ПРОГРАММЫ.bat` (графический интерфейс)
-или из консоли:
-
     python predict.py --input demo_input --checkpoint model_trained/best_model.pth --save-masks
 
 Замечание: при первом запуске .bat Windows может показать предупреждение

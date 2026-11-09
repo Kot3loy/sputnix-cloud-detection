@@ -8,12 +8,13 @@
 cd Sputnix
 source .venv/Scripts/activate        # Windows Git Bash; или .venv\Scripts\activate
 
+# 0. Если venv ещё нет — двойной клик по УСТАНОВКА.bat (всё поставит сам)
+
 # 1. Убедиться, что модель обучена (файл существует):
 #    outputs/checkpoints/best_model.pth
 #    Если нет — python train.py --data-dir data/processed --epochs 16
 
-# 2. Подготовить демо-папку (12 реальных снимков Спутникс + 6 синтетических,
-#    включая 2 с облачностью >75%):
+# 2. Подготовить демо-папку (реальные снимки Спутникс + синтетика с облачностью >75%):
 cp data/raw/sputnix/samples/*.jpg demo/demo_input/
 cp data/synthetic/images/synth_00{29,30,31,39,41,48}.png demo/demo_input/
 

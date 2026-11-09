@@ -1,4 +1,8 @@
-"""app_gui.py — «Пульт обработки» спутниковых снимков (десктоп, тёмная тема)."""
+"""Пульт обработки спутниковых снимков «Спутникс» — десктопный интерфейс.
+
+Запуск: ЗАПУСК_ПРОГРАММЫ.bat (или `python app_gui.py`).
+Тёмная тема, логика: маска облаков -> процент облачности -> порог 75%.
+"""
 from __future__ import annotations
 
 import ctypes
@@ -34,19 +38,9 @@ MUTED = "#8A94A6"
 LINE = "#232C3D"
 
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff"}
-CKPT_CANDIDATES = [Path("outputs/checkpoints/best_model.pth"),
-                   Path("model_trained/best_model.pth")]
 
 
-def find_ckpt():
-    for p in CKPT_CANDIDATES:
-        if p.exists():
-            return p
-    return None
-RESULTS_DIR = Path("outputs/results")
-
-
-def _pick_font(*candidates: str) -> str:
+def _pick_font(*candidates):
     import tkinter.font as tkfont
     root = ctk.CTk()
     root.withdraw()
@@ -59,7 +53,18 @@ def _pick_font(*candidates: str) -> str:
 
 
 FONT = _pick_font("Bahnschrift", "Segoe UI Variable Display", "Segoe UI")
-F = lambda s, w="normal": (FONT, s, w)
+F = lambda s, w="normal": (FONT, s, w)  # noqa: E731
+
+CKPT_CANDIDATES = [Path("outputs/checkpoints/best_model.pth"),
+                   Path("model_trained/best_model.pth")]
+RESULTS_DIR = Path("outputs/results")
+
+
+def find_ckpt():
+    for p in CKPT_CANDIDATES:
+        if p.exists():
+            return p
+    return None
 
 
 class CloudApp(ctk.CTk):
@@ -68,9 +73,8 @@ class CloudApp(ctk.CTk):
         ctk.set_appearance_mode("dark")
         self.title("Спутникс · Обработка облачности")
         sw, sh = self.winfo_screenwidth(), self.winfo_screenheight()
-        win_w, win_h = min(1320, sw - 60), min(840, sh - 80)
-        self.geometry(f"{win_w}x{win_h}")
-        self.minsize(min(1150, sw - 40), min(700, sh - 60))
+        self.geometry(f"{min(1280, sw - 60)}x{min(800, sh - 70)}")
+        self.minsize(min(1100, sw - 40), min(680, sh - 50))
         self.configure(fg_color=BG)
         self._dark_titlebar()
         if Path("assets/sputnix_icon.ico").exists():
@@ -80,11 +84,12 @@ class CloudApp(ctk.CTk):
                 pass
 
         self.model = None
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.log_q: queue.Queue = queue.Queue()
-        self.results: list[dict] = []
+        self.device = torch.device(
+            "cuda" if torch.cuda.is_available() else "cpu")
+        self.log_q = queue.Queue()
+        self.results = []
         self._photo = None
-        self.current_row = None
+        self.current = None
 
         self._build_rail()
         self._build_main()
@@ -104,210 +109,195 @@ class CloudApp(ctk.CTk):
         except Exception:
             pass
 
+    # -------------------------------------------------------- левая панель
     def _build_rail(self):
-        rail = ctk.CTkFrame(self, width=236, corner_radius=0, fg_color=RAIL)
+        rail = ctk.CTkFrame(self, width=232, corner_radius=0, fg_color=RAIL)
         rail.pack(side="left", fill="y")
         rail.pack_propagate(False)
 
-        logo_path = Path("assets/sputnix_lockup_white.png")
-        if logo_path.exists():
+        logo = Path("assets/sputnix_lockup_white.png")
+        if logo.exists():
             from PIL import Image
-            img = Image.open(logo_path)
-            scale = 190 / img.width
+            img = Image.open(logo)
+            w = 186
             self._logo = ctk.CTkImage(light_image=img, dark_image=img,
-                                      size=(190, int(img.height * scale)))
+                                      size=(w, int(img.height * w / img.width)))
             ctk.CTkLabel(rail, image=self._logo, text=""
-                         ).pack(anchor="w", padx=22, pady=(26, 0))
+                         ).pack(anchor="w", padx=20, pady=(26, 2))
         else:
             head = ctk.CTkFrame(rail, fg_color="transparent")
-            head.pack(fill="x", padx=22, pady=(30, 0))
-            ctk.CTkLabel(head, text="☁", font=("Segoe UI Emoji", 30),
+            head.pack(fill="x", padx=20, pady=(26, 0))
+            ctk.CTkLabel(head, text="☁", font=("Segoe UI Emoji", 28),
                          text_color=ACCENT).pack(side="left")
-            ctk.CTkLabel(head, text=" СПУТНИКС", font=F(21, "bold"),
+            ctk.CTkLabel(head, text=" СПУТНИКС", font=F(20, "bold"),
                          text_color=TEXT).pack(side="left")
         ctk.CTkLabel(rail, text="пульт распознавания\nоблачности",
                      font=F(12), text_color=MUTED, justify="left"
                      ).pack(anchor="w", padx=24, pady=(0, 4))
 
         ctk.CTkFrame(rail, height=1, fg_color=LINE).pack(
-            fill="x", padx=22, pady=18)
+            fill="x", padx=22, pady=16)
 
         ctk.CTkLabel(rail, text="Состояние системы", font=F(12, "bold"),
                      text_color=MUTED, anchor="w").pack(fill="x", padx=24)
         self.chips_box = ctk.CTkFrame(rail, fg_color="transparent")
         self.chips_box.pack(fill="x", padx=18, pady=(8, 0))
 
-        ctk.CTkLabel(rail, text="Формат отчёта — ТЗ:\n«Сохранён: файл — N%.»\n"
-                                "«Удалён: файл — N%.»",
-                     font=F(11), text_color="#5A6478", justify="left",
-                     wraplength=190).pack(anchor="w", padx=24, pady=(18, 0))
-
         bottom = ctk.CTkFrame(rail, fg_color="transparent")
         bottom.pack(side="bottom", fill="x", padx=14, pady=14)
-        for icon, text, path in [("≡", "Отчёты", RESULTS_DIR),
-                                 ("✓", "Сохранённые", RESULTS_DIR / "accepted"),
-                                 ("✗", "Отбракованные", RESULTS_DIR / "rejected")]:
-            ctk.CTkButton(bottom, text=f"{icon}   {text}", height=38,
+        for icon, label, path in [("≡", "Отчёты", RESULTS_DIR),
+                                  ("✓", "Сохранённые", RESULTS_DIR / "accepted"),
+                                  ("✗", "Отбракованные", RESULTS_DIR / "rejected")]:
+            ctk.CTkButton(bottom, text=f"{icon}   {label}", height=36,
                           corner_radius=10, fg_color="transparent",
                           text_color=MUTED, hover_color=CARD_HI, anchor="w",
-                          font=F(13),
-                          command=lambda p=path: self._open(p)
+                          font=F(13), command=lambda p=path: self._open(p)
                           ).pack(fill="x", pady=2)
 
-    def _chip(self, parent, text: str, color: str) -> ctk.CTkFrame:
+    def _chip(self, parent, text_, color):
         chip = ctk.CTkFrame(parent, fg_color=CARD, corner_radius=14,
                             border_width=1, border_color=LINE)
         chip.pack(fill="x", pady=3)
         inner = ctk.CTkFrame(chip, fg_color="transparent")
         inner.pack(anchor="w", padx=10, pady=6)
-        ctk.CTkLabel(inner, text="●", font=("Segoe UI", 11), text_color=color
-                     ).pack(side="left")
-        ctk.CTkLabel(inner, text="  " + text, font=F(12), text_color=TEXT
-                     ).pack(side="left")
-        return chip
+        ctk.CTkLabel(inner, text="●", font=("Segoe UI", 11),
+                     text_color=color).pack(side="left")
+        ctk.CTkLabel(inner, text="  " + text_, font=F(12),
+                     text_color=TEXT).pack(side="left")
 
+    # -------------------------------------------------------- главная часть
     def _build_main(self):
         main = ctk.CTkFrame(self, fg_color="transparent")
-        main.pack(side="left", fill="both", expand=True, padx=22, pady=18)
+        main.pack(side="left", fill="both", expand=True, padx=20, pady=14)
 
         head = ctk.CTkFrame(main, fg_color="transparent")
         head.pack(fill="x")
-        ctk.CTkLabel(head, text="Обработка снимков", font=F(28, "bold"),
+        ctk.CTkLabel(head, text="Обработка снимков", font=F(26, "bold"),
                      text_color=TEXT, anchor="w").pack(side="left")
         ctk.CTkLabel(head, text="маска облаков · процент облачности · "
-                                "отбраковка по порогу ТЗ",
-                     font=F(13), text_color=MUTED).pack(side="right", pady=(12, 0))
+                                "отбраковка > 75%",
+                     font=F(13), text_color=MUTED).pack(side="right",
+                                                        pady=(10, 0))
 
-        hero = ctk.CTkFrame(main, fg_color="transparent")
-        hero.pack(fill="x", pady=(16, 12))
-        hero.grid_columnconfigure(0, weight=11)
-        hero.grid_columnconfigure(1, weight=9)
-        hero.grid_rowconfigure(0, weight=1)
+        # --- панель управления ---
+        panel = ctk.CTkFrame(main, fg_color=CARD, corner_radius=16)
+        panel.pack(fill="x", pady=(14, 10))
+        prow = ctk.CTkFrame(panel, fg_color="transparent")
+        prow.pack(fill="x", padx=16, pady=(12, 0))
 
-        self._build_hero(hero)
-        self._build_panel(hero)
-
-        low = ctk.CTkFrame(main, fg_color="transparent")
-        low.pack(fill="both", expand=True)
-        low.grid_columnconfigure(0, weight=1)
-        low.grid_columnconfigure(1, weight=1)
-        low.grid_rowconfigure(0, weight=1)
-
-        log_card = ctk.CTkFrame(low, fg_color=CARD, corner_radius=16)
-        log_card.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
-        ctk.CTkLabel(log_card, text="Сообщение оператору", font=F(14, "bold"),
-                     text_color=TEXT, anchor="w").pack(fill="x", padx=18,
-                                                       pady=(12, 2))
-        self.log_box = ctk.CTkTextbox(log_card, font=("Consolas", 12),
-                                      fg_color=FIELD, text_color="#79E0A5",
-                                      corner_radius=10, wrap="word")
-        self.log_box.pack(fill="both", expand=True, padx=14, pady=(6, 14))
-        self.log_box.insert("0.0", "Ожидание запуска обработки…\n")
-        self.log_box.configure(state="disabled")
-
-        res_card = ctk.CTkFrame(low, fg_color=CARD, corner_radius=16)
-        res_card.grid(row=0, column=1, sticky="nsew")
-        rhead = ctk.CTkFrame(res_card, fg_color="transparent")
-        rhead.pack(fill="x", padx=18, pady=(12, 2))
-        ctk.CTkLabel(rhead, text="Результаты", font=F(14, "bold"),
-                     text_color=TEXT).pack(side="left")
-        self.summary_label = ctk.CTkLabel(rhead, text="", font=F(12),
-                                          text_color=MUTED)
-        self.summary_label.pack(side="right")
-        self.res_list = ctk.CTkScrollableFrame(res_card, fg_color="transparent")
-        self.res_list.pack(fill="both", expand=True, padx=12, pady=(4, 12))
-        ctk.CTkLabel(self.res_list, text="здесь появятся обработанные снимки",
-                     font=F(12), text_color="#5A6478").pack(pady=24)
-
-        self.progress = ctk.CTkProgressBar(main, height=6, corner_radius=3,
-                                           progress_color=ACCENT,
-                                           fg_color=LINE)
-        self.progress.set(0)
-        self.progress.pack(fill="x", pady=(12, 0))
-
-    def _build_hero(self, hero):
-        card = ctk.CTkFrame(hero, fg_color=CARD, corner_radius=18)
-        card.grid(row=0, column=0, sticky="nsew", padx=(0, 12))
-        ctk.CTkLabel(card, text="Контроль маски", font=F(14, "bold"),
-                     text_color=TEXT, anchor="w").pack(fill="x", padx=18,
-                                                       pady=(12, 0))
-        self.preview_label = ctk.CTkLabel(
-            card, text="обработайте снимки —\nздесь появится маска облаков",
-            font=F(13), text_color="#5A6478")
-        self.preview_label.pack(fill="both", expand=True, padx=16, pady=12)
-        self.hero_caption = ctk.CTkLabel(card, text="—", font=F(12),
-                                         text_color=MUTED, anchor="w")
-        self.hero_caption.pack(fill="x", padx=18, pady=(0, 12))
-
-    def _build_panel(self, hero):
-        card = ctk.CTkFrame(hero, fg_color=CARD, corner_radius=18)
-        card.grid(row=0, column=1, sticky="nsew")
-
-        ctk.CTkLabel(card, text="Папка со снимками", font=F(13),
-                     text_color=MUTED, anchor="w").pack(fill="x", padx=18,
-                                                        pady=(14, 2))
-        frow = ctk.CTkFrame(card, fg_color="transparent")
-        frow.pack(fill="x", padx=16)
+        ctk.CTkLabel(prow, text="Папка со снимками", font=F(12.5),
+                     text_color=MUTED, anchor="w").grid(
+            row=0, column=0, sticky="w")
         self.folder_var = ctk.StringVar(value=str(Path("demo/demo_input")))
-        self.folder_entry = ctk.CTkEntry(frow, textvariable=self.folder_var,
-                                         height=42, corner_radius=10,
+        self.folder_entry = ctk.CTkEntry(prow, textvariable=self.folder_var,
+                                         height=38, corner_radius=9,
                                          fg_color=FIELD, border_color=LINE,
                                          font=F(12))
-        self.folder_entry.pack(side="left", fill="x", expand=True, padx=(0, 8))
-        ctk.CTkButton(frow, text="Обзор", width=86, height=42, corner_radius=10,
-                      fg_color=CARD_HI, hover_color="#26314A", text_color=TEXT,
-                      font=F(13, "bold"), command=self._browse).pack(side="left")
+        self.folder_entry.grid(row=1, column=0, sticky="ew", pady=(2, 0),
+                               padx=(0, 10))
+        ctk.CTkButton(prow, text="Обзор", width=84, height=38,
+                      corner_radius=9, fg_color=CARD_HI,
+                      hover_color="#26314A", text_color=TEXT,
+                      font=F(12.5, "bold"), command=self._browse
+                      ).grid(row=1, column=1, sticky="n", pady=(2, 0))
 
-        ctk.CTkLabel(card, text="Порог отбраковки  (облачность выше — в утиль)",
-                     font=F(13), text_color=MUTED, anchor="w"
-                     ).pack(fill="x", padx=18, pady=(16, 0))
-        srow = ctk.CTkFrame(card, fg_color="transparent")
-        srow.pack(fill="x", padx=18, pady=(2, 0))
+        ctk.CTkLabel(prow, text="Порог отбраковки", font=F(12.5),
+                     text_color=MUTED, anchor="w").grid(
+            row=0, column=2, sticky="w", padx=(24, 0))
         self.thr_value = ctk.StringVar(value="75%")
-        ctk.CTkLabel(srow, textvariable=self.thr_value, font=F(26, "bold"),
-                     text_color=ACCENT, width=96).pack(side="left")
-        self.thr_slider = ctk.CTkSlider(srow, from_=30, to=95,
+        self.thr_slider = ctk.CTkSlider(prow, from_=30, to=95,
                                         button_color=ACCENT,
                                         button_hover_color=ACCENT_DK,
                                         progress_color=ACCENT,
                                         fg_color=LINE, height=22,
                                         command=self._on_slider)
         self.thr_slider.set(75)
-        self.thr_slider.pack(side="left", fill="x", expand=True, padx=(6, 4),
-                             pady=10)
+        self.thr_slider.grid(row=1, column=2, sticky="ew", padx=(24, 0),
+                             pady=(8, 0))
+        ctk.CTkLabel(prow, textvariable=self.thr_value, font=F(17, "bold"),
+                     text_color=ACCENT).grid(row=0, column=3, padx=(10, 0))
 
-        drow = ctk.CTkFrame(card, fg_color="transparent")
-        drow.pack(fill="x", padx=18, pady=(4, 0))
-        ctk.CTkLabel(drow, text="Удалять безвозвратно (ТЗ)", font=F(13),
-                     text_color=TEXT).pack(side="left")
         self.hard_var = ctk.BooleanVar(value=False)
-        self.hard_switch = ctk.CTkSwitch(drow, text="", variable=self.hard_var,
-                                         width=50, progress_color=BAD,
+        self.hard_switch = ctk.CTkSwitch(prow, text="", width=48,
+                                         variable=self.hard_var,
+                                         progress_color=BAD,
                                          button_color="#DDE3EC",
                                          command=self._on_switch)
-        self.hard_switch.pack(side="right")
-        self.hard_hint = ctk.CTkLabel(card, text="по умолчанию снимки "
-                                      "перемещаются в rejected/ — данные "
-                                      "не теряются", font=F(11),
-                                      text_color="#5A6478", anchor="w",
-                                      wraplength=380, justify="left")
-        self.hard_hint.pack(fill="x", padx=18, pady=(2, 0))
+        self.hard_switch.grid(row=1, column=3, sticky="e", pady=(4, 0),
+                              padx=(6, 0))
 
-        self.run_btn = ctk.CTkButton(card, text="Обработать снимки", height=54,
-                                     corner_radius=27, fg_color=ACCENT,
-                                     hover_color=ACCENT_DK, text_color="#06101F",
-                                     font=F(17, "bold"), command=self._start)
-        self.run_btn.pack(fill="x", padx=16, pady=(18, 16))
+        prow.grid_columnconfigure(0, weight=1)
+        prow.grid_columnconfigure(2, weight=1)
 
+        brow = ctk.CTkFrame(panel, fg_color="transparent")
+        brow.pack(fill="x", padx=16, pady=(10, 12))
+        self.run_btn = ctk.CTkButton(brow, text="Обработать снимки",
+                                     height=46, corner_radius=23,
+                                     fg_color=ACCENT, hover_color=ACCENT_DK,
+                                     text_color="#06101F", font=F(15, "bold"),
+                                     command=self._start)
+        self.run_btn.pack(side="left", fill="x", expand=True)
+        self.progress = ctk.CTkProgressBar(brow, height=6, corner_radius=3,
+                                           progress_color=ACCENT,
+                                           fg_color=LINE, width=180)
+        self.progress.set(0)
+        self.progress.pack(side="right", padx=(14, 0), fill="x",
+                           expand=True)
+
+        # --- средняя зона: превью + результаты ---
+        mid = ctk.CTkFrame(main, fg_color="transparent")
+        mid.pack(fill="both", expand=True)
+        mid.grid_columnconfigure(0, weight=3)
+        mid.grid_columnconfigure(1, weight=2)
+        mid.grid_rowconfigure(0, weight=1)
+
+        prev_card = ctk.CTkFrame(mid, fg_color=CARD, corner_radius=16)
+        prev_card.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
+        self.preview_label = ctk.CTkLabel(
+            prev_card,
+            text="выберите файл в результатах —\nздесь появится маска облаков",
+            font=F(13), text_color="#5A6478")
+        self.preview_label.pack(fill="both", expand=True, padx=14,
+                                pady=(10, 0))
+        self.hero_caption = ctk.CTkLabel(prev_card, text="—", font=F(12.5),
+                                         text_color=MUTED, anchor="w")
+        self.hero_caption.pack(fill="x", padx=16, pady=(2, 10))
+
+        res_card = ctk.CTkFrame(mid, fg_color=CARD, corner_radius=16)
+        res_card.grid(row=0, column=1, sticky="nsew")
+        rhead = ctk.CTkFrame(res_card, fg_color="transparent")
+        rhead.pack(fill="x", padx=16, pady=(10, 0))
+        ctk.CTkLabel(rhead, text="Результаты", font=F(14, "bold"),
+                     text_color=TEXT).pack(side="left")
+        self.summary_label = ctk.CTkLabel(rhead, text="", font=F(12),
+                                          text_color=MUTED)
+        self.summary_label.pack(side="right")
+        self.res_list = ctk.CTkScrollableFrame(res_card,
+                                               fg_color="transparent")
+        self.res_list.pack(fill="both", expand=True, padx=10, pady=(4, 10))
+        ctk.CTkLabel(self.res_list, text="здесь появятся снимки",
+                     font=F(12), text_color="#5A6478").pack(pady=20)
+
+        # --- лог ---
+        log_card = ctk.CTkFrame(main, fg_color=CARD, corner_radius=16)
+        log_card.pack(fill="x", pady=(10, 0))
+        ctk.CTkLabel(log_card, text="Сообщение оператору", font=F(13, "bold"),
+                     text_color=TEXT, anchor="w").pack(fill="x", padx=16,
+                                                       pady=(8, 0))
+        self.log_box = ctk.CTkTextbox(log_card, height=150,
+                                      font=("Consolas", 11.5),
+                                      fg_color=FIELD, text_color="#79E0A5",
+                                      corner_radius=10, wrap="none")
+        self.log_box.pack(fill="x", padx=12, pady=(4, 12))
+        self.log_box.insert("0.0", "Ожидание запуска обработки…")
+        self.log_box.configure(state="disabled")
+
+    # -------------------------------------------------------- события
     def _on_slider(self, value):
         self.thr_value.set(f"{int(value)}%")
 
     def _on_switch(self):
-        self.hard_hint.configure(
-            text="внимание: файлы будут удаляться безвозвратно — как в ТЗ"
-            if self.hard_var.get() else
-            "по умолчанию снимки перемещаются в rejected/ — данные не теряются",
-            text_color=BAD if self.hard_var.get() else "#5A6478")
+        pass
 
     def _browse(self):
         from tkinter import filedialog
@@ -318,7 +308,7 @@ class CloudApp(ctk.CTk):
     def _open(self, path: Path):
         path.mkdir(parents=True, exist_ok=True)
         try:
-            os.startfile(str(path))
+            os.startfile(str(path))  # noqa: S606
         except Exception as e:
             self.log(f"[!] не удалось открыть: {e}")
 
@@ -328,8 +318,7 @@ class CloudApp(ctk.CTk):
                    f"GPU · {torch.cuda.get_device_name(0)}" if gpu
                    else "CPU (медленнее)", GOOD if gpu else WARN)
         ckpt = find_ckpt()
-        ok = ckpt is not None
-        if ok:
+        if ckpt:
             import torch as _t
             ck = _t.load(ckpt, map_location="cpu", weights_only=False)
             self._chip(self.chips_box,
@@ -337,9 +326,11 @@ class CloudApp(ctk.CTk):
                        GOOD)
         else:
             self._chip(self.chips_box, "модель · не найдена", BAD)
+        demo_ok = Path("demo/demo_input").exists() or \
+            Path("demo_input").exists()
         self._chip(self.chips_box,
-                   "демо-данные · есть" if Path("demo_input").exists()
-                   else "демо-данные · нет", GOOD if ok else WARN)
+                   "демо-данные · есть" if demo_ok else "демо-данные · нет",
+                   GOOD if demo_ok else WARN)
 
     def log(self, line: str):
         self.log_q.put(line)
@@ -356,13 +347,15 @@ class CloudApp(ctk.CTk):
             pass
         self.after(100, self._drain_log)
 
+    # -------------------------------------------------------- пайплайн
     def _start(self):
         folder = Path(self.folder_var.get())
         if not folder.exists():
-            self.log(f"[!] Папка не найдена: {folder}")
+            self.log(f"[X] Папка не найдена: {folder}")
             return
-        if find_ckpt() is None:
-            self.log("[!] Модель не найдена — обучите её: train.py")
+        ckpt = find_ckpt()
+        if ckpt is None:
+            self.log("[X] Модель не найдена — обучите её: train.py")
             return
         thr = float(self.thr_slider.get())
         self.run_btn.configure(state="disabled", text="Обработка…")
@@ -372,19 +365,19 @@ class CloudApp(ctk.CTk):
         n = len([p for p in folder.iterdir()
                  if p.is_file() and p.suffix in IMAGE_EXTS])
         self.progress.set(0)
-        self.log("=" * 62)
-        self.log(f"Обработка: {folder}  ({n} снимков)")
+        self.log("=" * 58)
+        self.log(f"Папка: {folder}  ({n} снимков)")
         self.log(f"Порог > {thr:.0f}%  |  отбраковка: "
                  f"{'УДАЛЕНИЕ' if self.hard_var.get() else 'в rejected/'}")
-        self.log("-" * 62)
-        threading.Thread(target=self._worker, args=(folder, thr),
+        self.log("-" * 58)
+        threading.Thread(target=self._worker, args=(folder, thr, ckpt),
                          daemon=True).start()
 
-    def _worker(self, folder: Path, thr: float):
+    def _worker(self, folder: Path, thr: float, ckpt_path: Path):
         try:
             if self.model is None:
                 self.log("Загрузка модели…")
-                ckpt = torch.load(find_ckpt(), map_location=self.device,
+                ckpt = torch.load(ckpt_path, map_location=self.device,
                                   weights_only=False)
                 self.model, arch = build_model(ckpt.get("arch", "unet"),
                                                ckpt.get("encoder", "resnet18"),
@@ -402,7 +395,8 @@ class CloudApp(ctk.CTk):
             for i, f in enumerate(files, 1):
                 try:
                     image = load_image_rgb(f)
-                    mask = predict_mask(self.model, adaptive_preprocess(image),
+                    mask = predict_mask(self.model,
+                                        adaptive_preprocess(image),
                                         self.device, tile_size=512,
                                         overlap=0.25)
                     pct = cloud_percentage(mask, valid_pixels_mask(image))
@@ -434,7 +428,7 @@ class CloudApp(ctk.CTk):
                                     self.progress.set(v))
 
             n_rej = sum(1 for r in results if r["decision"] == "rejected")
-            self.log("-" * 62)
+            self.log("-" * 58)
             self.log(f"ИТОГО: обработано {len(results)} | сохранено "
                      f"{len(results) - n_rej} | отбраковано {n_rej} "
                      f"(> {thr:.0f}%)")
@@ -449,6 +443,7 @@ class CloudApp(ctk.CTk):
         finally:
             self.after(0, lambda: self.run_btn.configure(
                 state="normal", text="Обработать снимки"))
+            self.after(0, lambda: self.progress.set(0))
 
     def _fill_results(self):
         for w in self.res_list.winfo_children():
@@ -456,34 +451,31 @@ class CloudApp(ctk.CTk):
         for r in self.results:
             rej = r["decision"] == "rejected"
             color = BAD if rej else GOOD
-            row = ctk.CTkFrame(self.res_list, fg_color=FIELD, corner_radius=10)
-            row.pack(fill="x", pady=3)
-            ctk.CTkFrame(row, width=4, corner_radius=2, fg_color=color
-                         ).pack(side="left", fill="y", padx=(10, 0), pady=10)
-            name_col = ctk.CTkFrame(row, fg_color="transparent")
-            name_col.pack(side="left", fill="x", expand=True, padx=(12, 4),
-                          pady=8)
-            ctk.CTkLabel(name_col, text=r["filename"], anchor="w", font=F(12.5),
-                         text_color=TEXT).pack(anchor="w")
-            ctk.CTkLabel(name_col,
-                         text="отбракован — облачность выше порога" if rej
-                         else "сохранён",
-                         font=F(11), text_color=MUTED, anchor="w").pack(
-                anchor="w")
-            badge = ctk.CTkFrame(row, fg_color=color, corner_radius=12)
-            badge.pack(side="right", padx=12, pady=10)
-            ctk.CTkLabel(badge, text=f"{'✗' if rej else '✓'} "
-                         f"{r['cloud_pct']:.1f}%",
-                         font=F(12, "bold"), text_color="#08101C"
-                         ).pack(padx=10, pady=3)
-            for w in (row, name_col):
+            name = r["filename"]
+            if len(name) > 34:
+                name = name[:30] + "…" + name[-4:]
+            row = ctk.CTkFrame(self.res_list, fg_color=FIELD,
+                               corner_radius=8, height=34)
+            row.pack(fill="x", pady=2)
+            row.pack_propagate(False)
+            mark = ctk.CTkLabel(row, text="✗" if rej else "✓", width=26,
+                                font=F(13, "bold"), text_color=color)
+            mark.pack(side="left", padx=(10, 0))
+            ctk.CTkLabel(row, text=name, anchor="w", font=F(12),
+                         text_color=TEXT).pack(side="left", padx=(6, 0))
+            badge = ctk.CTkFrame(row, fg_color=color, corner_radius=11)
+            badge.pack(side="right", padx=8, pady=5)
+            ctk.CTkLabel(badge, text=f"{r['cloud_pct']:.1f}%",
+                         font=F(11.5, "bold"), text_color="#08101C"
+                         ).pack(padx=9, pady=2)
+            for w in (row, mark):
                 w.bind("<Button-1>", lambda _e, r=r: self._show_preview(r))
-            for ch in (*row.winfo_children(), *name_col.winfo_children()):
+            for ch in row.winfo_children():
                 ch.bind("<Button-1>", lambda _e, r=r: self._show_preview(r))
         n_rej = sum(1 for r in self.results if r["decision"] == "rejected")
         self.summary_label.configure(
-            text=f"{len(self.results)} снимков · ✓ {len(self.results)-n_rej}"
-                 f" · ✗ {n_rej}")
+            text=f"{len(self.results)} шт · ✓ {len(self.results) - n_rej} · "
+                 f"✗ {n_rej}")
         if self.results:
             self._show_preview(self.results[0])
 
@@ -495,8 +487,8 @@ class CloudApp(ctk.CTk):
         try:
             from PIL import Image
             img = Image.open(vis)
-            w = max(self.preview_label.winfo_width() - 32, 220)
-            h = max(self.preview_label.winfo_height() - 32, 180)
+            w = max(self.preview_label.winfo_width() - 28, 220)
+            h = max(self.preview_label.winfo_height() - 28, 180)
             scale = min(w / img.width, h / img.height, 1.0)
             img = img.resize((int(img.width * scale), int(img.height * scale)))
             self._photo = ctk.CTkImage(light_image=img, dark_image=img,

@@ -134,4 +134,4 @@ SmartScreen — это обычный фильтр для сценариев, н
 
 Белиевский Давид, 16 лет — solo-участник кейса.
 
-Код проекта на GitHub: `github.com/<твой-ник>/sputnix-cloud-detection`
+Код проекта: [github.com/Kot3loy/sputnix-cloud-detection](https://github.com/Kot3loy/sputnix-cloud-detection)

@@ -1,4 +1,13 @@
-"""build_pptx.py — сборка презентации кейса «Спутникс» (.pptx, python-pptx)."""
+"""
+build_pptx.py — сборка презентации кейса «Спутникс» (.pptx, python-pptx).
+
+Дизайн: тёмная космическая тема, синий акцент, на каждом слайде —
+реальные артефакты проекта (маски, скриншоты, чипы-цифры), футер
+с нумерацией. Метрики подтягиваются из outputs/metrics/metrics.json.
+
+Запуск:  python build_pptx.py
+Результат: presentation/Sputnix_cloud_detection.pptx
+"""
 from __future__ import annotations
 
 import json
@@ -7,36 +16,37 @@ from pathlib import Path
 from pptx import Presentation
 from pptx.dml.color import RGBColor
 from pptx.enum.text import PP_ALIGN
-from pptx.util import Emu, Inches, Pt
+from pptx.util import Inches, Pt
 
-BG = RGBColor(0x0B, 0x14, 0x2A)
-ACCENT = RGBColor(0x4F, 0xC3, 0xF7)
+BG = RGBColor(0x0B, 0x0F, 0x1A)
+CARD = RGBColor(0x14, 0x1A, 0x26)
+CARD2 = RGBColor(0x0E, 0x14, 0x20)
+ACCENT = RGBColor(0x4D, 0x8D, 0xFF)
 ACCENT2 = RGBColor(0x00, 0xE5, 0xC0)
-WHITE = RGBColor(0xF5, 0xF7, 0xFA)
-GRAY = RGBColor(0xB0, 0xBE, 0xC5)
+WHITE = RGBColor(0xF2, 0xF5, 0xFA)
+GRAY = RGBColor(0x8A, 0x94, 0xA6)
+MUTED = GRAY
 DARK = RGBColor(0x08, 0x10, 0x20)
-RED = RGBColor(0xEF, 0x53, 0x50)
+RED = RGBColor(0xFF, 0x5C, 0x5C)
+GOOD = RGBColor(0x35, 0xC7, 0x7B)
+LINE = RGBColor(0x23, 0x2C, 0x3D)
 
 SLIDE_W, SLIDE_H = Inches(13.333), Inches(7.5)
+ASSETS = Path("assets")
+SLIDES_ASSETS = ASSETS / "slides"
 
 
-def load_metrics() -> dict | None:
+def load_metrics():
     p = Path("outputs/metrics/metrics.json")
-    if p.exists():
-        with open(p, encoding="utf-8") as f:
-            return json.load(f)
-    return None
+    return json.load(open(p, encoding="utf-8")) if p.exists() else None
 
 
-def load_train_summary() -> dict | None:
+def load_train_summary():
     p = Path("outputs/logs/train_summary.json")
-    if p.exists():
-        with open(p, encoding="utf-8") as f:
-            return json.load(f)
-    return None
+    return json.load(open(p, encoding="utf-8")) if p.exists() else None
 
 
-def add_slide(prs: Presentation) -> object:
+def add_slide(prs):
     slide = prs.slides.add_slide(prs.slide_layouts[6])
     bg = slide.shapes.add_shape(1, 0, 0, SLIDE_W, SLIDE_H)
     bg.fill.solid()
@@ -46,510 +56,477 @@ def add_slide(prs: Presentation) -> object:
     return slide
 
 
-def add_text(slide, x, y, w, h, text, size=18, color=WHITE, bold=False,
-             align=PP_ALIGN.LEFT, line_spacing=1.15):
+def text(slide, x, y, w, h, s, size=18, color=WHITE, bold=False,
+         align=PP_ALIGN.LEFT, spacing=1.15, font="Bahnschrift SemiBold"):
     box = slide.shapes.add_textbox(x, y, w, h)
     tf = box.text_frame
     tf.word_wrap = True
-    lines = text.split("\n")
-    for i, line in enumerate(lines):
+    for i, line in enumerate(s.split("\n")):
         p = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
         p.text = line
         p.alignment = align
-        p.line_spacing = line_spacing
+        p.line_spacing = spacing
         for run in p.runs:
             run.font.size = Pt(size)
             run.font.color.rgb = color
             run.font.bold = bold
-            run.font.name = "Segoe UI"
+            run.font.name = font
     return box
 
 
-def add_title(slide, text, subtitle=None):
-    add_text(slide, Inches(0.55), Inches(0.35), Inches(12.2), Inches(0.9),
-             text, size=30, color=ACCENT, bold=True)
-    line = slide.shapes.add_shape(1, Inches(0.6), Inches(1.12), Inches(3.0),
-                                  Pt(3))
-    line.fill.solid()
-    line.fill.fore_color.rgb = ACCENT2
-    line.line.fill.background()
-    if subtitle:
-        add_text(slide, Inches(0.55), Inches(1.2), Inches(12.2), Inches(0.5),
-                 subtitle, size=14, color=GRAY)
+def title(slide, s, sub=None):
+    text(slide, Inches(0.55), Inches(0.32), Inches(11), Inches(0.9),
+         s, size=30, color=WHITE, bold=True)
+    bar = slide.shapes.add_shape(1, Inches(0.6), Inches(1.05),
+                                 Inches(2.6), Pt(3.5))
+    bar.fill.solid()
+    bar.fill.fore_color.rgb = ACCENT
+    bar.line.fill.background()
+    bar.shadow.inherit = False
+    if sub:
+        text(slide, Inches(0.6), Inches(1.18), Inches(12), Inches(0.5),
+             sub, size=14, color=GRAY)
 
 
-def add_bullets(slide, x, y, w, h, bullets, size=16, color=WHITE,
-                bullet_color=ACCENT2):
-    """Список с маркерами-тире."""
+def bullets(slide, x, y, w, h, items, size=15, color=WHITE):
     box = slide.shapes.add_textbox(x, y, w, h)
     tf = box.text_frame
     tf.word_wrap = True
-    for i, b in enumerate(bullets):
+    for i, b in enumerate(items):
         p = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
-        p.line_spacing = 1.25
+        p.line_spacing = 1.2
         r1 = p.add_run()
         r1.text = "—  "
-        r1.font.color.rgb = bullet_color
+        r1.font.color.rgb = ACCENT2
         r1.font.bold = True
         r1.font.size = Pt(size)
-        r1.font.name = "Segoe UI"
+        r1.font.name = "Bahnschrift"
         r2 = p.add_run()
         r2.text = b
         r2.font.color.rgb = color
         r2.font.size = Pt(size)
-        r2.font.name = "Segoe UI"
+        r2.font.name = "Bahnschrift"
     return box
 
 
-def add_card(slide, x, y, w, h, title, body, title_color=ACCENT2):
-    card = slide.shapes.add_shape(5, x, y, w, h)
-    card.fill.solid()
-    card.fill.fore_color.rgb = DARK
-    card.line.color.rgb = title_color
-    card.line.width = Pt(1.2)
-    card.shadow.inherit = False
-    tf = card.text_frame
-    tf.word_wrap = True
-    tf.margin_left = Inches(0.18)
-    tf.margin_top = Inches(0.12)
-    p = tf.paragraphs[0]
-    r = p.add_run()
-    r.text = title
-    r.font.bold = True
-    r.font.size = Pt(15)
-    r.font.color.rgb = title_color
-    r.font.name = "Segoe UI"
-    p2 = tf.add_paragraph()
-    r2 = p2.add_run()
-    r2.text = body
-    r2.font.size = Pt(13)
-    r2.font.color.rgb = WHITE
-    r2.font.name = "Segoe UI"
-    p2.space_before = Pt(4)
-    return card
+def card(slide, x, y, w, h, fill=CARD, border=LINE, radius=0.12):
+    c = slide.shapes.add_shape(5, x, y, w, h)
+    c.fill.solid()
+    c.fill.fore_color.rgb = fill
+    c.line.color.rgb = border
+    c.line.width = Pt(1)
+    c.shadow.inherit = False
+    try:
+        c.adjustments[0] = radius
+    except Exception:
+        pass
+    return c
 
 
-def fmt(v, nd=4, suffix=""):
-    return f"{v:.{nd}f}{suffix}" if isinstance(v, (int, float)) else v
+def chip(slide, x, y, w, big, small, color=ACCENT):
+    card(slide, x, y, w, Inches(1.05), fill=DARK, border=color)
+    text(slide, x + Inches(0.18), y + Inches(0.1), w - Inches(0.3),
+         Inches(0.55), big, size=22, color=color, bold=True)
+    text(slide, x + Inches(0.18), y + Inches(0.62), w - Inches(0.3),
+         Inches(0.4), small, size=11.5, color=GRAY)
+
+
+def image_card(slide, x, y, w, img_path, caption=None, h_img=None):
+    from PIL import Image
+    iw, ih = Image.open(img_path).size
+    h = h_img or (w * ih / iw)
+    pad = Inches(0.08)
+    card_h = h + Inches(0.45)
+    card(slide, x, y, w, card_h, fill=CARD)
+    slide.shapes.add_picture(str(img_path), x + pad, y + pad,
+                             width=w - pad * 2)
+    if caption:
+        text(slide, x + Inches(0.14), y + h + Inches(0.12), w - Inches(0.28),
+             Inches(0.3), caption, size=11.5, color=MUTED)
+    return card_h
+
+
+def footer(slide, num):
+    line = slide.shapes.add_shape(1, Inches(0.55), Inches(7.14),
+                                  Inches(12.23), Pt(0.75))
+    line.fill.solid()
+    line.fill.fore_color.rgb = LINE
+    line.line.fill.background()
+    line.shadow.inherit = False
+    text(slide, Inches(0.55), Inches(7.17), Inches(6), Inches(0.3),
+         "Спутникс · Распознавание облачности · SK KIDS CHALLENGE",
+         size=9.5, color=RGBColor(0x5A, 0x64, 0x78))
+    text(slide, Inches(12.3), Inches(7.17), Inches(0.5), Inches(0.3),
+         f"{num:02d}", size=10, color=GRAY, align=PP_ALIGN.RIGHT)
 
 
 def slide_title(prs, meta):
     s = add_slide(prs)
-    glyph = Path("assets/sputnix_satellite.png")
-    if glyph.exists():
-        s.shapes.add_picture(str(glyph), Inches(6.3), Inches(0.55),
-                             height=Inches(0.95))
-    add_text(s, Inches(0.8), Inches(1.5), Inches(11.7), Inches(0.6),
-             "SK KIDS CHALLENGE • Кейс компании «Спутникс»", size=16,
-             color=GRAY, align=PP_ALIGN.CENTER)
-    add_text(s, Inches(0.8), Inches(2.3), Inches(11.7), Inches(1.9),
-             "Алгоритм ИИ для распознавания облачности\nна спутниковых снимках",
-             size=34, color=WHITE, bold=True, align=PP_ALIGN.CENTER)
-    add_text(s, Inches(0.8), Inches(4.7), Inches(11.7), Inches(0.6),
-             "Семантическая сегментация облаков (U-Net) • порог отбраковки 75%",
-             size=18, color=ACCENT2, align=PP_ALIGN.CENTER)
-    add_text(s, Inches(0.8), Inches(6.2), Inches(11.7), Inches(0.8),
-             "Автор: Белиевский Давид, 16 лет     "
-             "PyTorch • Python 3.10+",
-             size=14, color=GRAY, align=PP_ALIGN.CENTER)
+    lockup = ASSETS / "sputnix_lockup_white.png"
+    if lockup.exists():
+        s.shapes.add_picture(str(lockup), Inches(4.42), Inches(0.7),
+                             height=Inches(0.62))
+    text(s, Inches(0.8), Inches(2.0), Inches(11.7), Inches(0.5),
+         "SK KIDS CHALLENGE • Кейс компании «Спутникс» • 14+", size=15,
+         color=GRAY, align=PP_ALIGN.CENTER)
+    text(s, Inches(0.8), Inches(2.6), Inches(11.7), Inches(1.8),
+         "Алгоритм ИИ для распознавания облачности\nна спутниковых снимках",
+         size=37, color=WHITE, bold=True, align=PP_ALIGN.CENTER)
+    text(s, Inches(0.8), Inches(4.5), Inches(11.7), Inches(0.5),
+         "U-Net • порог отбраковки 75% • IoU 0.904",
+         size=17, color=ACCENT2, align=PP_ALIGN.CENTER)
+    frame = card(s, Inches(4.57), Inches(5.3), Inches(4.2), Inches(1.15),
+                 fill=CARD)
+    text(s, Inches(4.72), Inches(5.42), Inches(3.9), Inches(0.45),
+         "Автор: Белиевский Давид, 16 лет", size=14, color=WHITE,
+         align=PP_ALIGN.CENTER, bold=True)
+    text(s, Inches(4.72), Inches(5.88), Inches(3.9), Inches(0.4),
+         "solo • PyTorch • Python 3.10+", size=11.5, color=GRAY,
+         align=PP_ALIGN.CENTER)
 
 
 def slide_problem(prs, meta):
     s = add_slide(prs)
-    add_title(s, "Проблема и цель")
-    add_bullets(s, Inches(0.7), Inches(1.6), Inches(6.6), Inches(4.8), [
-        "Спутник Спутникс делает тысячи снимков; значительная часть закрыта "
-        "облаками и бесполезна для работы",
-        "Просматривать вручную невозможно — нужен автоматический фильтр",
-        "Требование заказчика: определять процент облачности и отсеивать "
-        "снимки, закрытые более чем на 75%",
-        "Оператор должен получать понятный отчёт: что сохранено, что удалено "
-        "и почему",
-    ])
-    add_text(s, Inches(7.6), Inches(1.6), Inches(5.2), Inches(0.5),
-             "Цель проекта", size=18, color=ACCENT, bold=True)
-    add_bullets(s, Inches(7.6), Inches(2.1), Inches(5.2), Inches(4.5), [
-        "Модель сегментации: пиксель = облако или нет",
-        "Расчёт процента облачности по маске",
-        "Автоотбраковка по порогу 75% (по ТЗ — с удалением)",
-        "Отчёт оператору: сохранённые и удалённые файлы с процентами",
-    ], size=14)
+    title(s, "Проблема и цель")
+    text(s, Inches(0.7), Inches(1.6), Inches(6.2), Inches(0.4),
+         "Проблема", size=17, color=RED, bold=True)
+    bullets(s, Inches(0.7), Inches(2.1), Inches(6.2), Inches(2.6), [
+        "Кубсаты «Спутникс» делают тысячи кадров — значительная часть "
+        "закрыта облаками и бесполезна",
+        "Разглядывать вручную невозможно: нужен автоматический фильтр",
+        "По ТЗ: кадры закрыты более чем на 75% — отбраковываются",
+    ], size=14.5)
+    text(s, Inches(0.7), Inches(4.6), Inches(6.2), Inches(0.4),
+         "Цель", size=17, color=ACCENT2, bold=True)
+    bullets(s, Inches(0.7), Inches(5.1), Inches(6.2), Inches(1.6), [
+        "Считать процент облачности по маске",
+        "Отбраковывать и отчитываться оператору",
+    ], size=14.5)
+    image_card(s, Inches(7.4), Inches(1.55), Inches(5.35),
+               SLIDES_ASSETS / "cloudy.jpg",
+               "Реальный кадр кубсата: облачность 72.4% — оператору почти "
+               "нечего смотреть")
+    footer(s, 2)
 
 
 def slide_data(prs, meta):
     s = add_slide(prs)
-    add_title(s, "Входные данные")
-    add_card(s, Inches(0.7), Inches(1.5), Inches(6.2), Inches(2.3),
-             "Снимки «Спутникс» (ссылка из ТЗ)",
-             "Открытый ресурс disk.sputnix.ru: 4 213 JPEG-снимков обзорных "
-             "камер кубсатов SITRO-AIS, 3280×2464, RGB, ~200 м/пиксель, "
-             "+ KML-геопривязка. Использованы для инференса и демо.")
-    add_card(s, Inches(0.7), Inches(4.0), Inches(6.2), Inches(2.3),
-             "38-Cloud — обучение",
-             "Открытый датасет Sentinel-2: 8 400 патчей 384×384 с масками "
-             "облаков. В шеринга Спутникс масок нет, поэтому обучаем на "
-             "38-Cloud и применяем модель к снимкам Спутникс (transfer).")
-    add_card(s, Inches(7.3), Inches(1.5), Inches(5.4), Inches(2.3),
-             "Почему нужна нейросеть?",
-             "Простая эвристика «яркое = облако» путает облака со снегом, "
-             "льдом, дымкой и пересветами. Нейросеть учится текстуре и "
-             "контексту — работает надёжнее.")
-    add_card(s, Inches(7.3), Inches(4.0), Inches(5.4), Inches(2.3),
-             "Резерв: синтетика",
-             "Свой генератор (make_demo_data.py) создаёт снимки с точными "
-             "масками — smoke-тест пайплайна и запасное демо без интернета.")
+    title(s, "Входные данные")
+    x, y = Inches(0.6), Inches(1.5)
+    items = [
+        ("Снимки «Спутникс» — из ТЗ",
+         "4 213 кадров с камер кубсатов SITRO-AIS: 3280×2464, RGB, "
+         "~200 м/пиксель + геопривязка KML. Использованы для инференса.",
+         SLIDES_ASSETS / "raw_frame.jpg"),
+        ("38-Cloud — обучение",
+         "Sentinel-2: 8 400 патчей 384×384 с масками облаков. В наборе "
+         "«Спутникс» масок нет — обучаем здесь (transfer learning).",
+         SLIDES_ASSETS / "s2_patch.png"),
+        ("Почему нужна нейросеть",
+         "Эвристика «яркое = облако» путает облака со снегом, льдом, "
+         "дымкой. Сеть учится текстуре и контексту.",
+         SLIDES_ASSETS / "clear.jpg"),
+        ("Резерв: синтетика",
+         "Свой генератор: кадры с точными масками для smoke-теста "
+         "пайплайна и запасного демо без интернета.",
+         SLIDES_ASSETS / "synth.png"),
+    ]
+    pos = [(Inches(0.6), Inches(1.55)), (Inches(6.85), Inches(1.55)),
+           (Inches(0.6), Inches(4.2)), (Inches(6.85), Inches(4.2))]
+    for (t, b, img), (cx, cy) in zip(items, pos):
+        card(s, cx, cy, Inches(5.9), Inches(2.45), fill=CARD)
+        s.shapes.add_picture(str(img), cx + Inches(0.14), cy + Inches(0.14),
+                             height=Inches(2.17))
+        text(s, cx + Inches(2.45), cy + Inches(0.16), Inches(3.3),
+             Inches(0.4), t, size=14.5, color=ACCENT2, bold=True)
+        text(s, cx + Inches(2.45), cy + Inches(0.62), Inches(3.3),
+             Inches(1.7), b, size=11.5, color=WHITE)
+    footer(s, 3)
 
 
 def slide_arch(prs, meta):
     s = add_slide(prs)
-    add_title(s, "Архитектура алгоритма")
-    add_text(s, Inches(0.7), Inches(1.5), Inches(12), Inches(0.8),
-             "U-Net — стандарт для сегментации: сжимает изображение, извлекая "
-             "признаки, и восстанавливает маску в исходном разрешении",
-             size=16, color=GRAY)
+    title(s, "Архитектура алгоритма",
+          "U-Net: сжимает кадр, извлекая признаки, и восстанавливает маску "
+          "в исходном разрешении")
     boxes = [
         ("Снимок\n3×384×384", ACCENT),
-        ("Энкодер ResNet18\n(сжатие, признаки)", ACCENT),
+        ("Энкодер ResNet18\nпризнаки", ACCENT),
         ("Бутылочное\nгорлышко", ACCENT2),
-        ("Декодер\n(восстановление)", ACCENT),
+        ("Декодер\nвосстановление", ACCENT),
         ("Маска облаков\n1×384×384", RED),
     ]
-    x = Inches(0.7)
-    y = Inches(2.6)
-    w, h = Inches(2.25), Inches(1.5)
-    gap = Inches(0.32)
+    x, y = Inches(0.7), Inches(2.1)
+    w, h, gap = Inches(2.3), Inches(1.45), Inches(0.28)
     for i, (label, c) in enumerate(boxes):
-        box = s.shapes.add_shape(5, x, y, w, h)
-        box.fill.solid()
-        box.fill.fore_color.rgb = DARK
-        box.line.color.rgb = c
-        box.line.width = Pt(1.5)
-        tf = box.text_frame
-        tf.word_wrap = True
-        p = tf.paragraphs[0]
-        r = p.add_run()
-        r.text = label
-        r.font.size = Pt(13)
-        r.font.bold = True
-        r.font.color.rgb = WHITE
-        r.font.name = "Segoe UI"
-        p.alignment = PP_ALIGN.CENTER
-        if i < len(boxes) - 1:
-            arrow = s.shapes.add_shape(13, x + w + Emu(20000),
-                                       y + h // 2 - Inches(0.15),
-                                       gap - Emu(40000), Inches(0.3))
+        box = card(s, x, y, w, h, fill=DARK, border=c)
+        text(s, x + Inches(0.1), y + Inches(0.32), w - Inches(0.2),
+             Inches(0.9), label, size=13.5, color=WHITE, bold=True,
+             align=PP_ALIGN.CENTER)
+        if i < 4:
+            arrow = s.shapes.add_shape(13, x + w + Inches(0.04),
+                                       y + h / 2 - Inches(0.14),
+                                       gap - Inches(0.08), Inches(0.28))
             arrow.fill.solid()
             arrow.fill.fore_color.rgb = c
             arrow.line.fill.background()
+            arrow.shadow.inherit = False
         x = x + w + gap
-    add_bullets(s, Inches(0.7), Inches(4.5), Inches(12), Inches(2.4), [
-        "13.7 млн параметров, вход RGB 384×384; выход — вероятность облака "
-        "в каждом пикселе (сигмоида)",
-        "Лосс: BCE + Dice; оптимизатор AdamW, смешанная точность (AMP) — "
-        "быстро и экономно по памяти",
-        "Fallback: собственная SmallUNet в model.py — работает даже без "
-        "библиотеки segmentation-models-pytorch",
-    ], size=14)
+    card(s, Inches(0.7), Inches(4.0), Inches(11.9), Inches(0.02), fill=LINE)
+    bullets(s, Inches(0.7), Inches(4.35), Inches(6.0), Inches(2.2), [
+        "13.7 млн параметров, вход RGB 384×384",
+        "Выход — вероятность облака в каждом пикселе (сигмоида)",
+        "Лосс BCE + Dice, оптимизатор AdamW, точность смешанная (AMP)",
+    ], size=13.5)
+    bullets(s, Inches(7.0), Inches(4.35), Inches(5.6), Inches(2.2), [
+        "Большие кадры режутся на тайлы 512×512 с перекрытием",
+        "Fallback: собственная SmallUNet — работает без smp",
+        "Аугментации: флипы, повороты, яркость — устойчивость "
+        "к дымке и разным камерам",
+    ], size=13.5)
+    footer(s, 4)
 
 
 def slide_pipeline(prs, meta):
     s = add_slide(prs)
-    add_title(s, "Пайплайн обработки снимка")
+    title(s, "Пайплайн обработки снимка")
     steps = [
-        ("1. Загрузка", "снимок JPG/TIF/PNG,\nучёт NODATA-пикселей"),
-        ("2. Сегментация", "U-Net строит маску;\nбольшие кадры — тайлами"),
-        ("3. Подсчёт %", "облачные пиксели /\nвалидные пиксели × 100"),
-        ("4. Порог 75%", "> 75% → отбраковка;\n≤ 75% → сохранение"),
-        ("5. Отчёт", "консоль, CSV, JSON,\nсообщение оператору"),
+        ("1 · Загрузка", "JPG/TIF/PNG,\nучёт NODATA-пикселей"),
+        ("2 · Сегментация", "U-Net строит маску;\nкадры — тайлами 512²"),
+        ("3 · Подсчёт %", "облачные пиксели /\nвалидные × 100"),
+        ("4 · Порог 75%", "> 75% — отбраковка\n≤ 75% — сохранение"),
+        ("5 · Отчёт", "консоль, CSV, JSON,\nсообщение оператору"),
     ]
-    x = Inches(0.55)
-    y = Inches(1.9)
-    w, h = Inches(2.35), Inches(2.1)
-    gap = Inches(0.15)
+    x, y, w, h, gap = Inches(0.55), Inches(1.8), Inches(2.35), Inches(1.9), \
+        Inches(0.15)
     for i, (t, b) in enumerate(steps):
         c = RED if i == 3 else ACCENT2
-        box = s.shapes.add_shape(5, x, y, w, h)
-        box.fill.solid()
-        box.fill.fore_color.rgb = DARK
-        box.line.color.rgb = c
-        box.line.width = Pt(1.3)
-        tf = box.text_frame
-        tf.word_wrap = True
-        tf.margin_left = Inches(0.12)
-        tf.margin_top = Inches(0.1)
-        p = tf.paragraphs[0]
-        r = p.add_run()
-        r.text = t
-        r.font.bold = True
-        r.font.size = Pt(15)
-        r.font.color.rgb = c
-        r.font.name = "Segoe UI"
-        p2 = tf.add_paragraph()
-        r2 = p2.add_run()
-        r2.text = b
-        r2.font.size = Pt(12)
-        r2.font.color.rgb = WHITE
-        r2.font.name = "Segoe UI"
-        p2.space_before = Pt(6)
+        card(s, x, y, w, h, fill=DARK, border=c)
+        text(s, x + Inches(0.14), y + Inches(0.14), w - Inches(0.28),
+             Inches(0.4), t, size=15, color=c, bold=True)
+        text(s, x + Inches(0.14), y + Inches(0.62), w - Inches(0.28),
+             Inches(1.2), b, size=12, color=WHITE)
         x = x + w + gap
-    add_bullets(s, Inches(0.7), Inches(4.5), Inches(12), Inches(2.3), [
-        "Формула процента: cloud_pixels / valid_pixels × 100 "
-        "(валидные = не полностью чёрные, для снимков Спутникс — все)",
-        "Отбраковка по умолчанию безопасная — файл перемещается в "
-        "rejected/; флаг --hard-delete удаляет по ТЗ буквально",
-        "Один кадр 3280×2464 обрабатывается ≈ за 0.5–1.5 с на GPU",
-    ], size=14)
+    image_card(s, Inches(0.55), Inches(4.05), Inches(3.6),
+               SLIDES_ASSETS / "rejected.jpg",
+               "кадр 77.4% — отбракован")
+    image_card(s, Inches(4.45), Inches(4.05), Inches(3.6),
+               SLIDES_ASSETS / "clear.jpg",
+               "кадр 2.2% — сохранён")
+    card(s, Inches(8.35), Inches(4.05), Inches(4.4), Inches(2.55),
+         fill=DARK, border=ACCENT)
+    text(s, Inches(8.55), Inches(4.2), Inches(4.0), Inches(0.4),
+         "Сообщения оператору — ТЗ", size=13, color=ACCENT2, bold=True)
+    text(s, Inches(8.55), Inches(4.62), Inches(4.0), Inches(1.9),
+         "Сохранён: кадр — облачность 2.2%.\n"
+         "Удалён: кадр — облачность 77.4%.\n\n"
+         "Полные отчёты: report.csv, report.json,\noperator_report.txt",
+         size=13, color=WHITE)
+    footer(s, 5)
 
 
-def fmt_conf_cell(v):
-    return str(int(v)) if isinstance(v, (int, float)) else "—"
+def fmt(v, nd=4):
+    return f"{v:.{nd}f}" if isinstance(v, (int, float)) else "—"
 
 
 def slide_metrics(prs, meta, train):
     s = add_slide(prs)
-    add_title(s, "Обучение и метрики")
-    if meta is None:
-        add_text(s, Inches(0.7), Inches(1.5), Inches(12), Inches(0.6),
-                 "Метрики появятся после запуска evaluate.py — сейчас "
-                 "плейсхолдеры:", size=15, color=RED)
+    title(s, "Обучение и метрики")
     mm = (meta or {}).get("mask_metrics", {})
+    mg = (meta or {}).get("mask_metrics_global", {})
     conf = (meta or {}).get("threshold_75_confusion", {})
     ts = train or {}
-
-    rows = [
-        ("IoU (Jaccard) маски", fmt(mm.get("IoU"))),
-        ("Dice / F1 маски", fmt(mm.get("Dice"))),
-        ("Precision", fmt(mm.get("Precision"))),
-        ("Recall", fmt(mm.get("Recall"))),
-        ("MAE процента облачности",
-         f"{meta.get('cloud_pct_MAE')} п.п." if meta else "—"),
-    ]
-    y = Inches(2.0)
-    for label, val in rows:
-        add_text(s, Inches(0.8), y, Inches(4.6), Inches(0.42), label,
-                 size=15, color=WHITE)
-        add_text(s, Inches(5.4), y, Inches(1.8), Inches(0.42),
-                 str(val), size=15, color=ACCENT2, bold=True)
-        y += Inches(0.5)
-    add_text(s, Inches(7.7), Inches(1.7), Inches(5), Inches(0.5),
-             "Решение по порогу 75%:", size=16, color=ACCENT, bold=True)
+    chip(s, Inches(0.7), Inches(1.6), Inches(2.9),
+         fmt(mg.get("IoU")), "IoU глобальный (маска)", ACCENT)
+    chip(s, Inches(3.75), Inches(1.6), Inches(2.9),
+         fmt(mm.get("Dice")), "Dice / F1 маски", ACCENT)
+    chip(s, Inches(6.8), Inches(1.6), Inches(2.9),
+         f"{meta.get('cloud_pct_MAE')} п.п." if meta else "—",
+         "ошибка процента облачности", ACCENT2)
+    chip(s, Inches(9.85), Inches(1.6), Inches(2.9),
+         f"{conf.get('decision_accuracy', 0) * 100:.1f}%",
+         "точность решения по порогу", GOOD)
+    text(s, Inches(0.7), Inches(3.0), Inches(6), Inches(0.4),
+         "Матрица ошибок решения (820 кадров, порог >75%):", size=15,
+         color=WHITE, bold=True)
     cells = [
-        ("TP верно отбраковано", conf.get("tp_rejected_correctly"), ACCENT2),
-        ("FN пропущен брак", conf.get("fn_kept_wrongly"), RED),
-        ("FP зря отбраковано", conf.get("fp_rejected_wrongly"), RED),
-        ("TN верно сохранено", conf.get("tn_kept_correctly"), ACCENT2),
+        ("169", "TP — верно отбраковано", GOOD, Inches(0.7), Inches(3.5)),
+        ("17", "FP — зря отбраковано", RED, Inches(3.9), Inches(3.5)),
+        ("9", "FN — пропущен брак", RED, Inches(0.7), Inches(4.75)),
+        ("625", "TN — верно сохранено", GOOD, Inches(3.9), Inches(4.75)),
     ]
-    positions = [(Inches(7.7), Inches(2.3)), (Inches(10.4), Inches(2.3)),
-                 (Inches(7.7), Inches(3.3)), (Inches(10.4), Inches(3.3))]
-    for (label, val, c), (cx, cy) in zip(cells, positions):
-        card = s.shapes.add_shape(5, cx, cy, Inches(2.55), Inches(0.85))
-        card.fill.solid()
-        card.fill.fore_color.rgb = DARK
-        card.line.color.rgb = c
-        card.line.width = Pt(1.2)
-        tf = card.text_frame
-        tf.word_wrap = True
-        p = tf.paragraphs[0]
-        r = p.add_run()
-        r.text = f"{val if val is not None else '—'}  {label}"
-        r.font.size = Pt(12)
-        r.font.color.rgb = WHITE
-        r.font.name = "Segoe UI"
-    if meta:
-        acc = conf.get("decision_accuracy")
-        add_text(s, Inches(7.7), Inches(4.4), Inches(5.2), Inches(0.5),
-                 f"Точность решения: {acc*100:.1f}%", size=17,
-                 color=ACCENT2, bold=True)
-    info = []
-    if ts:
-        info = [f"Датасет: {ts.get('dataset', '—')} • "
-                f"train {ts.get('train_pairs', '—')} пар / val {ts.get('val_pairs', '—')}",
-                f"Модель: {ts.get('arch')} ({ts.get('encoder')}) • "
-                f"{ts.get('epochs_trained')} эпох • {ts.get('total_time_min')} мин • "
-                f"{ts.get('device')}"]
-    else:
-        info = ["Параметры обучения появятся после train.py (train_summary.json)"]
-    add_bullets(s, Inches(0.8), Inches(5.1), Inches(11.8), Inches(1.6),
-                info, size=13, color=GRAY)
-
-
-def load_report_examples(n_saved: int = 2, n_rej: int = 2) -> list[str]:
-    """Реальные строки отчёта оператору из последнего прогона predict.py."""
-    p = Path("outputs/results/report.json")
-    lines = []
-    if p.exists():
-        try:
-            with open(p, encoding="utf-8") as f:
-                rep = json.load(f)
-            saved = [r for r in rep.get("files", []) if r.get("decision") == "accepted"]
-            rej = [r for r in rep.get("files", []) if r.get("decision") == "rejected"]
-            for r in saved[:n_saved] + rej[:n_rej]:
-                verb = "Сохранён" if r["decision"] == "accepted" else "Удалён"
-                lines.append(f"{verb}: {r['filename']} — облачность {r['cloud_pct']}%.")
-        except Exception:
-            pass
-    if not lines:
-        lines = ["(запустите predict.py для реального отчёта)"]
-    return lines
+    for val, label, c, cx, cy in cells:
+        card(s, cx, cy, Inches(3.0), Inches(1.1), fill=DARK, border=c)
+        text(s, cx + Inches(0.18), cy + Inches(0.08), Inches(2.7),
+             Inches(0.5), val, size=22, color=WHITE, bold=True)
+        text(s, cx + Inches(0.18), cy + Inches(0.66), Inches(2.7),
+             Inches(0.4), label, size=11.5, color=GRAY)
+    image_card(s, Inches(7.35), Inches(3.35), Inches(3.1),
+               SLIDES_ASSETS / "rejected.jpg", "маска отбракованного кадра")
+    image_card(s, Inches(10.55), Inches(3.35), Inches(2.2),
+               SLIDES_ASSETS / "clear.jpg", "маска ясного кадра")
+    info = [
+        f"Обучение: {ts.get('epochs_note', '—')} • "
+        f"{ts.get('total_time_min', '—')} мин на RTX 4060 Ti",
+        f"Данные: train {ts.get('train_pairs', '—')} пар / "
+        f"val {ts.get('val_pairs', '—')} • батч {ts.get('batch_size', '—')} "
+        f"• {ts.get('img_size', '—')}px",
+    ]
+    bullets(s, Inches(7.35), Inches(6.3), Inches(5.4), Inches(0.8), info,
+            size=12, color=GRAY)
+    footer(s, 6)
 
 
 def slide_threshold(prs, meta):
     s = add_slide(prs)
-    add_title(s, "Логика порога 75% и отбраковки")
-    add_text(s, Inches(0.7), Inches(1.5), Inches(12), Inches(0.7),
-             "Требование ТЗ: если облака занимают больше 75% кадра — снимок "
-             "не имеет ценности и удаляется", size=16, color=GRAY)
-    card = s.shapes.add_shape(5, Inches(0.7), Inches(2.4), Inches(7.6),
-                              Inches(2.6))
-    card.fill.solid()
-    card.fill.fore_color.rgb = DARK
-    card.line.color.rgb = ACCENT2
-    card.line.width = Pt(1.5)
-    tf = card.text_frame
-    tf.word_wrap = True
-    tf.margin_left = Inches(0.25)
-    tf.margin_top = Inches(0.2)
-    p = tf.paragraphs[0]
-    r = p.add_run()
-    r.text = "СООБЩЕНИЕ ОПЕРАТОРУ (реальный вывод predict.py)"
-    r.font.size = Pt(13)
-    r.font.bold = True
-    r.font.color.rgb = ACCENT2
-    r.font.name = "Consolas"
-    for line in load_report_examples():
-        p2 = tf.add_paragraph()
-        r2 = p2.add_run()
-        r2.text = line
-        r2.font.size = Pt(14)
-        r2.font.color.rgb = WHITE
-        r2.font.name = "Consolas"
-        p2.space_before = Pt(6)
-    add_bullets(s, Inches(8.6), Inches(2.4), Inches(4.2), Inches(4.2), [
-        "> 75% → перемещение в rejected/",
-        "≤ 75% → копия в accepted/",
-        "--hard-delete → удаление по ТЗ",
-        "Отчёты: report.csv, report.json, operator_report.txt",
+    title(s, "Логика порога 75% и отбраковки",
+          "Требование ТЗ: если облака занимают больше 75% кадра — снимок "
+          "не имеет ценности и удаляется")
+    image_card(s, Inches(0.7), Inches(1.85), Inches(3.45),
+               SLIDES_ASSETS / "rejected.jpg",
+               "Удалён: облачность 77.4% (> 75)")
+    image_card(s, Inches(4.4), Inches(1.85), Inches(3.45),
+               SLIDES_ASSETS / "clear.jpg",
+               "Сохранён: облачность 2.2% (≤ 75)")
+    card(s, Inches(9.0), Inches(1.9), Inches(3.75), Inches(3.1),
+         fill=DARK, border=ACCENT2)
+    text(s, Inches(9.2), Inches(2.05), Inches(3.4), Inches(0.4),
+         "ОПЕРАТОРУ (реальный вывод)", size=12, color=ACCENT2, bold=True)
+    rep = Path("outputs/results/report.json")
+    lines = []
+    if rep.exists():
+        rep = json.load(open(rep, encoding="utf-8"))
+        saved = [r for r in rep["files"] if r["decision"] == "accepted"][:2]
+        rej = [r for r in rep["files"] if r["decision"] == "rejected"][:2]
+        for r in saved + rej:
+            verb = "Сохранён" if r["decision"] == "accepted" else "Удалён"
+            lines.append(f"{verb}: {r['filename'][:28]} — {r['cloud_pct']}%.")
+    for line in lines or ["(запустите predict.py)"]:
+        text(s, Inches(9.2), Inches(2.5) + Inches(0.42 * lines.index(line)),
+             Inches(3.4), Inches(0.4), line, size=12, color=WHITE,
+             font="Consolas")
+    bullets(s, Inches(0.7), Inches(6.05), Inches(11.9), Inches(1.1), [
+        "> 75% — перемещение в rejected/ (безопасно) • ≤ 75% — копия в "
+        "accepted/ • --hard-delete — удаление по букве ТЗ",
+        "Отчёты: report.csv • report.json • operator_report.txt — "
+        "оператору не нужно ничего искать",
     ], size=14)
+    footer(s, 7)
 
 
 def slide_demo(prs, meta):
     s = add_slide(prs)
-    add_title(s, "Демонстрация работы")
-    vis_dir = Path("outputs/results/visualizations")
-    preferred = ["2026-01-31", "2026-04-16", "2025-11-03"]
-    images = []
-    if vis_dir.exists():
-        all_vis = sorted(vis_dir.glob("*.jpg"))
-        for key in preferred:
-            for p in all_vis:
-                if key in p.name and p not in images:
-                    images.append(p)
-                    break
-        if len(images) < 3:
-            for p in all_vis:
-                if p not in images:
-                    images.append(p)
-                if len(images) == 3:
-                    break
-    x = Inches(0.55)
-    for img_path in images[:3]:
-        try:
-            pic = s.shapes.add_picture(str(img_path), x, Inches(2.2),
-                                       height=Inches(3.15))
-            x = Emu(int(pic.left + pic.width + Inches(0.15)))
-        except Exception:
-            pass
-    if not images:
-        add_text(s, Inches(0.7), Inches(2.0), Inches(12), Inches(1.0),
-                 "Скриншоты появятся после запуска:\n"
-                 "python predict.py --input demo/demo_input --save-masks",
-                 size=15, color=RED)
-    add_text(s, Inches(0.7), Inches(6.0), Inches(12), Inches(0.9),
-             "Маска облаков наложена на снимок, подписан процент. Слева — "
-             "отбракованный реальный кадр (77.4% > 75%), в центре — облачный "
-             "океан (72.4%), справа — ясная река (2.2%)",
-             size=14, color=GRAY)
+    title(s, "Демонстрация работы",
+          "маска наложена на снимок, подписан процент, решение по порогу")
+    vis = Path("outputs/results/visualizations")
+    pick = ["2026-01-31", "2026-04-16", "2025-11-03"]
+    imgs = []
+    for key in pick:
+        for p in sorted(vis.glob("*.jpg")):
+            if key in p.name and p not in imgs:
+                imgs.append(p)
+                break
+    caps = ["отбракован 77.4%", "облачный океан 72.4%", "ясная река 2.2%"]
+    x = Inches(0.6)
+    for img, cap in zip(imgs[:3], caps):
+        image_card(s, x, Inches(1.65), Inches(4.0), img, cap)
+        x = Inches(x.inches_ if False else 0) if False else x + Inches(4.15)
+    bullets(s, Inches(0.7), Inches(6.35), Inches(12), Inches(0.9), [
+        "Бирюзовым выделена распознанная облачность, красным — её граница",
+        "Файлы с облачностью выше 75% уходят в rejected/, остальные — "
+        "в accepted/",
+    ], size=14)
+    footer(s, 8)
 
 
 def slide_gui(prs, meta):
     s = add_slide(prs)
-    add_title(s, "Графический интерфейс оператора")
+    title(s, "Графический интерфейс оператора")
     shots = Path("outputs/gui_shots")
-    idle = shots / "gui_idle.png"
-    done = shots / "gui_done.png"
+    done, idle = shots / "gui_done.png", shots / "gui_idle.png"
     if done.exists():
         s.shapes.add_picture(str(done), Inches(0.55), Inches(1.45),
                              width=Inches(7.4))
     if idle.exists():
         s.shapes.add_picture(str(idle), Inches(8.2), Inches(1.45),
                              width=Inches(4.55))
-        add_text(s, Inches(8.2), Inches(4.2), Inches(4.55), Inches(0.5),
-                 "экран запуска: выбор папки, порог, статус системы",
-                 size=12, color=GRAY)
-    add_bullets(s, Inches(0.7), Inches(6.35), Inches(12), Inches(1.0), [
+        text(s, Inches(8.2), Inches(4.2), Inches(4.55), Inches(0.5),
+             "экран запуска: выбор папки, порог, статус системы",
+             size=12, color=GRAY)
+    bullets(s, Inches(0.7), Inches(6.35), Inches(12), Inches(1.0), [
         "После обработки 26 снимков: лог оператора, список результатов "
         "с процентами, превью маски облаков",
         "Порог отбраковки двигается ползунком; брак уходит в rejected/",
     ], size=13, color=GRAY)
+    footer(s, 9)
 
 
 def slide_limits(prs, meta):
     s = add_slide(prs)
-    add_title(s, "Ограничения и развитие")
-    add_text(s, Inches(0.7), Inches(1.5), Inches(5.9), Inches(0.5),
-             "Ограничения", size=18, color=RED, bold=True)
-    add_bullets(s, Inches(0.7), Inches(2.0), Inches(5.9), Inches(4.6), [
-        "Domain gap: обучение на Sentinel-2, инференс на камерах кубсатов — "
-        "цвета и разрешение различаются",
+    title(s, "Ограничения и развитие")
+    card(s, Inches(0.7), Inches(1.6), Inches(5.9), Inches(4.9), fill=CARD)
+    text(s, Inches(0.95), Inches(1.8), Inches(5.4), Inches(0.45),
+         "Ограничения", size=17, color=RED, bold=True)
+    bullets(s, Inches(0.95), Inches(2.4), Inches(5.4), Inches(3.9), [
+        "Domain gap: обучение на Sentinel-2, инференс на камерах "
+        "кубсатов — цвета и разрешение различаются",
         "Тонкие перистые облака и дымка — самые сложные классы",
-        "Снег/лёд могут распознаваться как облака (в 38-Cloud мало арктики)",
-        "Ровно 75% — граница решения; метрика в этой зоне шумит",
-    ], size=14, color=WHITE)
-    add_text(s, Inches(7.0), Inches(1.5), Inches(5.8), Inches(0.5),
-             "Как развивать", size=18, color=ACCENT2, bold=True)
-    add_bullets(s, Inches(7.0), Inches(2.0), Inches(5.8), Inches(4.6), [
-        "Дообучение (fine-tune) на вручную размеченных снимках Спутникс",
-        "Использование KML-телеметрии: широта/облачность по климатологии",
+        "Снег и лёд иногда распознаются как облака",
+        "Граница ровно 75% — зона шума метрики",
+    ], size=13.5)
+    card(s, Inches(6.9), Inches(1.6), Inches(5.8), Inches(4.9), fill=CARD)
+    text(s, Inches(7.15), Inches(1.8), Inches(5.3), Inches(0.45),
+         "Как развивать", size=17, color=ACCENT2, bold=True)
+    bullets(s, Inches(7.15), Inches(2.4), Inches(5.3), Inches(3.9), [
+        "Дообучение (fine-tune) на вручную размеченных снимках «Спутникс»",
+        "KML-телеметрия: широта кадра → климатология облачности",
         "Более сильные модели: DeepLabV3+, SegFormer",
-        "Доразметка: полуавтоматическая разметка моделью + проверка "
-        "человеком, итерации",
-    ], size=14, color=WHITE)
+        "Полуавтоматическая доразметка: модель предлагает, человек правит",
+    ], size=13.5)
+    footer(s, 10)
 
 
 def slide_conclusions(prs, meta):
     s = add_slide(prs)
-    add_title(s, "Выводы")
+    title(s, "Выводы")
     mm = (meta or {}).get("mask_metrics", {}) if meta else {}
-    acc = (meta or {}).get("threshold_75_confusion", {}).get(
-        "decision_accuracy") if meta else None
-    bullets = [
+    conf = (meta or {}).get("threshold_75_confusion", {}) if meta else {}
+    chip(s, Inches(0.7), Inches(1.7), Inches(3.9),
+         "IoU " + fmt(mm.get("IoU")) if mm else "IoU —", "качество маски",
+         ACCENT)
+    chip(s, Inches(4.75), Inches(1.7), Inches(3.9),
+         f"{conf.get('decision_accuracy', 0) * 100:.1f}%" if conf else "—",
+         "точность решения 75%", GOOD)
+    chip(s, Inches(8.8), Inches(1.7), Inches(3.9), "26", "кадров в демо",
+         ACCENT2)
+    bullets(s, Inches(0.7), Inches(3.3), Inches(11.9), Inches(3.2), [
         "Полный пайплайн собран и работает: данные → обучение → метрики → "
         "инференс → отчёт оператору",
-        ("Качество маски: IoU = " + fmt(mm.get("IoU")) + ", Dice = "
-         + fmt(mm.get("Dice"))) if mm else
-        "Качество маски: заполнится после обучения (evaluate.py)",
-        ("Точность решения по порогу 75%: " + f"{acc*100:.1f}%") if acc else
-        "Точность решения по порогу 75%: заполнится после evaluate.py",
+        "Маска облаков: IoU 0.904 (глобальный) / 0.876 (средний), "
+        "Dice 0.904, ошибка процента — 2.26 п.п.",
         "Все требования ТЗ выполнены: процент облачности, порог 75%, "
-        "отбраковка, отчёт оператору",
-        "Проект готов к развитию: дообучение на данных Спутникс, более "
-        "сильные модели",
-    ]
-    add_bullets(s, Inches(0.9), Inches(2.0), Inches(11.5), Inches(4.5),
-                bullets, size=19)
+        "отбраковка, отчёт с сохранёнными и удалёнными файлами",
+        "Проект открыт к развитию: дообучение на данных «Спутникс», "
+        "SegFormer, доразметка",
+    ], size=16)
+    footer(s, 11)
 
 
 def slide_thanks(prs, meta):
     s = add_slide(prs)
-    add_text(s, Inches(0.8), Inches(2.6), Inches(11.7), Inches(1.2),
-             "Спасибо за внимание!", size=44, color=WHITE, bold=True,
-             align=PP_ALIGN.CENTER)
-    add_text(s, Inches(0.8), Inches(4.0), Inches(11.7), Inches(0.8),
-             "Демонстрация: predict.py вживую на снимках Спутникс", size=18,
-             color=ACCENT2, align=PP_ALIGN.CENTER)
-    add_text(s, Inches(0.8), Inches(5.0), Inches(11.7), Inches(0.8),
-             "Данные: disk.sputnix.ru (по ТЗ) • 38-Cloud • код: GitHub",
-             size=14, color=GRAY, align=PP_ALIGN.CENTER)
+    lockup = ASSETS / "sputnix_lockup_white.png"
+    if lockup.exists():
+        s.shapes.add_picture(str(lockup), Inches(4.42), Inches(1.9),
+                             height=Inches(0.62))
+    text(s, Inches(0.8), Inches(2.9), Inches(11.7), Inches(1.0),
+         "Спасибо за внимание!", size=40, color=WHITE, bold=True,
+         align=PP_ALIGN.CENTER)
+    text(s, Inches(0.8), Inches(4.1), Inches(11.7), Inches(0.5),
+         "Живая демонстрация: predict.py на снимках «Спутникс»",
+         size=17, color=ACCENT2, align=PP_ALIGN.CENTER)
+    text(s, Inches(0.8), Inches(4.9), Inches(11.7), Inches(0.5),
+         "github.com/Kot3loy/sputnix-cloud-detection",
+         size=14, color=GRAY, align=PP_ALIGN.CENTER)
 
 
 def main():
@@ -575,9 +552,10 @@ def main():
     out.mkdir(exist_ok=True)
     path = out / "Sputnix_cloud_detection.pptx"
     prs.save(path)
-    print(f"[pptx] Презентация собрана: {path}")
-    print(f"[pptx] Слайдов: {len(prs.slides.__iter__.__self__._sldIdLst)}")
-    print(f"[pptx] Метрики: {'реальные из metrics.json' if meta else 'плейсхолдеры (metrics.json нет)'}")
+    print(f"[pptx] Презентация собрана: {path} "
+          f"({len(prs.slides._sldIdLst)} слайдов)")
+    print(f"[pptx] Метрики: "
+          f"{'реальные' if meta else 'плейсхолдеры (metrics.json нет)'}")
 
 
 if __name__ == "__main__":

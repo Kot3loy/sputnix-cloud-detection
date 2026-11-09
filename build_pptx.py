@@ -478,16 +478,18 @@ def slide_gui(prs, meta):
     idle = shots / "gui_idle.png"
     done = shots / "gui_done.png"
     if done.exists():
-        pic = s.shapes.add_picture(str(done), Inches(0.55), Inches(1.5),
-                                   width=Inches(8.1))
+        s.shapes.add_picture(str(done), Inches(0.55), Inches(1.45),
+                             width=Inches(7.4))
     if idle.exists():
-        s.shapes.add_picture(str(idle), Inches(8.85), Inches(1.5),
-                             width=Inches(4.0))
-    add_bullets(s, Inches(0.7), Inches(6.1), Inches(12), Inches(1.2), [
-        "Слева — программа после обработки 26 снимков: лог оператора, "
-        "список результатов с процентами, превью маски",
-        "Справа — экран запуска: выбор папки, порог отбраковки, "
-        "статус системы; порог можно двигать ползунком",
+        s.shapes.add_picture(str(idle), Inches(8.2), Inches(1.45),
+                             width=Inches(4.55))
+        add_text(s, Inches(8.2), Inches(4.2), Inches(4.55), Inches(0.5),
+                 "экран запуска: выбор папки, порог, статус системы",
+                 size=12, color=GRAY)
+    add_bullets(s, Inches(0.7), Inches(6.35), Inches(12), Inches(1.0), [
+        "После обработки 26 снимков: лог оператора, список результатов "
+        "с процентами, превью маски облаков",
+        "Порог отбраковки двигается ползунком; брак уходит в rejected/",
     ], size=13, color=GRAY)
 
 

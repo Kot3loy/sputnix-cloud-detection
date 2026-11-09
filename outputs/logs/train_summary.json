@@ -1,14 +1,14 @@
 {
   "arch": "unet",
   "encoder": "resnet18",
-  "epochs_trained": 16,
-  "best_val_iou": 0.9015,
+  "epochs_trained": 26,
+  "epochs_note": "16 базовых + 10 дообучение (lr 5e-5)",
+  "best_val_iou": 0.9041,
   "train_pairs": 7580,
   "val_pairs": 820,
   "batch_size": 8,
-  "lr": 0.0003,
   "img_size": 384,
-  "total_time_min": 20.4,
+  "total_time_min": 33.9,
   "device": "cuda",
   "amp": true,
   "dataset": "data/processed"

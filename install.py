@@ -29,7 +29,7 @@ def imports_ok():
 
 def pause():
     try:
-        pause()
+        input("Enter — выход...")
     except EOFError:
         pass
 

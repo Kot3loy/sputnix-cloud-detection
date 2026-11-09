@@ -1,0 +1,15 @@
+{
+  "arch": "unet",
+  "encoder": "resnet18",
+  "epochs_trained": 8,
+  "best_val_iou": 0.9007,
+  "train_pairs": 7580,
+  "val_pairs": 820,
+  "batch_size": 8,
+  "lr": 0.0003,
+  "img_size": 384,
+  "total_time_min": 11.6,
+  "device": "cuda",
+  "amp": true,
+  "dataset": "data/processed"
+}

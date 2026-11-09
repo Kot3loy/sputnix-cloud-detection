@@ -1,0 +1,44 @@
+# =====================================================================
+# Конфигурация решения кейса «Спутникс»: распознавание облачности
+# Все параметры можно переопределять флагами командной строки.
+# =====================================================================
+
+paths:
+  # Датасет для обучения (папки train/images + train/masks, val/images + val/masks)
+  data_dir: data/processed
+  # Синтетический датасет для smoke-теста пайплайна
+  synthetic_dir: data/synthetic
+  # Снимки Спутникс (инференс/демо)
+  sputnix_dir: data/raw/sputnix/samples
+  # Выходные артефакты
+  checkpoints_dir: outputs/checkpoints
+  logs_dir: outputs/logs
+  predictions_dir: outputs/predictions
+  metrics_dir: outputs/metrics
+  results_dir: outputs/results
+
+model:
+  arch: unet                  # unet (smp) | small_unet (своя реализация, без внешних зависимостей)
+  encoder: resnet18           # энкодер для smp: resnet18 | resnet34 | efficientnet-b0
+  pretrained: true            # ImageNet-веса энкодера (если доступен интернет)
+  in_channels: 3
+  classes: 1
+
+train:
+  epochs: 10                  # компактный режим: 10 эпох ≈ 15–25 мин на RTX 4060 Ti
+  batch_size: 8
+  img_size: 384               # нативный размер патчей 38-Cloud
+  lr: 3.0e-4
+  weight_decay: 1.0e-4
+  num_workers: 4              # 0 на Windows, если возникают проблемы с DataLoader
+  amp: true                   # смешанная точность (снижает нагрузку на GPU)
+  val_ratio: 0.1              # доля валидации при подготовке данных
+  seed: 42
+  max_steps_per_epoch: null   # null = без ограничений; число = обрезка эпохи (для быстрых прогонов)
+
+inference:
+  mask_threshold: 0.5         # порог сигмоиды для пикселя облака
+  cloud_threshold_pct: 75.0   # ПО ТЗ: облачность ВЫШЕ 75% -> снимок отбраковывается
+  tile_size: 512              # большие снимки режутся на тайлы с перекрытием
+  tile_overlap: 0.25
+  max_image_size: 2048        # предпросмотр/даунскейл для очень больших кадров (расчёт маски — по оригиналу)

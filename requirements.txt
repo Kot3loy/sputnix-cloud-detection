@@ -1,0 +1,27 @@
+# Кейс «Спутникс»: распознавание облачности на спутниковых снимках
+# Python 3.10+ (проверено на Python 3.14, Windows 10/11)
+
+# --- Нейросеть ---
+torch>=2.2
+torchvision>=0.17
+segmentation-models-pytorch>=0.3    # U-Net с pretrained-энкодером (опционально, есть fallback)
+
+# --- Работа с изображениями и данными ---
+opencv-python>=4.8
+numpy>=1.24
+pillow>=10.0
+pyarrow>=14.0          # чтение parquet-шардов 38-Cloud
+pandas>=2.0
+pyyaml>=6.0
+tqdm>=4.66
+
+# --- Метрики и визуализация ---
+scikit-learn>=1.3
+matplotlib>=3.7
+
+# --- Презентация ---
+python-pptx>=0.6.21
+
+# --- Аугментации (опционально, есть fallback на numpy/cv2) ---
+albumentations>=1.3
+customtkinter>=5.2

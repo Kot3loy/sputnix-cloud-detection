@@ -1,0 +1,146 @@
+{
+  "run_timestamp": "2026-11-09 19:55:13",
+  "meta": {
+    "cloud_threshold_pct": 75.0,
+    "hard_delete": false,
+    "input": "demo\\demo_input"
+  },
+  "summary": {
+    "total": 26,
+    "accepted": 23,
+    "rejected": 3,
+    "cloud_threshold_pct": 75.0
+  },
+  "files": [
+    {
+      "filename": "2025-09-23_20-11-15_SXC3-2315_1.jpg",
+      "cloud_pct": 43.5,
+      "decision": "accepted"
+    },
+    {
+      "filename": "2025-09-24_00-03-01_SXC3-235_1.jpg",
+      "cloud_pct": 28.1,
+      "decision": "accepted"
+    },
+    {
+      "filename": "2025-09-26_14-27-08_SXC3-2341_1.jpg",
+      "cloud_pct": 24.7,
+      "decision": "accepted"
+    },
+    {
+      "filename": "2025-10-08_16-16-32_SXC3-2341_1.jpg",
+      "cloud_pct": 35.5,
+      "decision": "accepted"
+    },
+    {
+      "filename": "2025-10-14_08-30-58_SXC3-2332_1.jpg",
+      "cloud_pct": 15.7,
+      "decision": "accepted"
+    },
+    {
+      "filename": "2025-10-27_00-12-55_SXC3-2334_1.jpg",
+      "cloud_pct": 27.4,
+      "decision": "accepted"
+    },
+    {
+      "filename": "2025-11-03_14-32-50_SXC3-2334_1.jpg",
+      "cloud_pct": 2.2,
+      "decision": "accepted"
+    },
+    {
+      "filename": "2025-11-14_13-39-04_SXC3-2334_1.jpg",
+      "cloud_pct": 51.8,
+      "decision": "accepted"
+    },
+    {
+      "filename": "2025-12-04_11-26-03_SXC3-2342_1.jpg",
+      "cloud_pct": 24.8,
+      "decision": "accepted"
+    },
+    {
+      "filename": "2026-01-22_06-35-18_SXC3-2316_1.jpg",
+      "cloud_pct": 0.1,
+      "decision": "accepted"
+    },
+    {
+      "filename": "2026-01-28_04-36-58_SXC3-236_1.jpg",
+      "cloud_pct": 31.6,
+      "decision": "accepted"
+    },
+    {
+      "filename": "2026-01-31_06-04-18_SXC3-232_1.jpg",
+      "cloud_pct": 77.4,
+      "decision": "rejected"
+    },
+    {
+      "filename": "2026-02-01_08-58-22_SXC3-2316_1.jpg",
+      "cloud_pct": 46.2,
+      "decision": "accepted"
+    },
+    {
+      "filename": "2026-03-27_16-53-06_SXC3-2315_1.jpg",
+      "cloud_pct": 69.0,
+      "decision": "accepted"
+    },
+    {
+      "filename": "2026-04-01_04-08-01_SXC3-2316_1.jpg",
+      "cloud_pct": 41.4,
+      "decision": "accepted"
+    },
+    {
+      "filename": "2026-04-16_05-51-33_SXC3-232_1.jpg",
+      "cloud_pct": 72.4,
+      "decision": "accepted"
+    },
+    {
+      "filename": "2026-06-01_22-40-17_SXC3-238_1.jpg",
+      "cloud_pct": 25.0,
+      "decision": "accepted"
+    },
+    {
+      "filename": "2026-07-26_13-59-03_SXC3-234_1.jpg",
+      "cloud_pct": 47.9,
+      "decision": "accepted"
+    },
+    {
+      "filename": "2026-09-05_16-49-34_SXC3-2370_1.jpg",
+      "cloud_pct": 71.2,
+      "decision": "accepted"
+    },
+    {
+      "filename": "2026-10-24_17-12-12_SXC3-2325_1.jpg",
+      "cloud_pct": 47.8,
+      "decision": "accepted"
+    },
+    {
+      "filename": "synth_0029.png",
+      "cloud_pct": 93.6,
+      "decision": "rejected"
+    },
+    {
+      "filename": "synth_0030.png",
+      "cloud_pct": 52.7,
+      "decision": "accepted"
+    },
+    {
+      "filename": "synth_0031.png",
+      "cloud_pct": 94.3,
+      "decision": "rejected"
+    },
+    {
+      "filename": "synth_0039.png",
+      "cloud_pct": 26.9,
+      "decision": "accepted"
+    },
+    {
+      "filename": "synth_0041.png",
+      "cloud_pct": 31.7,
+      "decision": "accepted"
+    },
+    {
+      "filename": "synth_0048.png",
+      "cloud_pct": 7.4,
+      "decision": "accepted"
+    }
+  ]
+}

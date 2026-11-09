@@ -34,7 +34,15 @@ MUTED = "#8A94A6"
 LINE = "#232C3D"
 
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff"}
-CKPT = Path("outputs/checkpoints/best_model.pth")
+CKPT_CANDIDATES = [Path("outputs/checkpoints/best_model.pth"),
+                   Path("model_trained/best_model.pth")]
+
+
+def find_ckpt():
+    for p in CKPT_CANDIDATES:
+        if p.exists():
+            return p
+    return None
 RESULTS_DIR = Path("outputs/results")
 
 
@@ -319,17 +327,18 @@ class CloudApp(ctk.CTk):
         self._chip(self.chips_box,
                    f"GPU · {torch.cuda.get_device_name(0)}" if gpu
                    else "CPU (медленнее)", GOOD if gpu else WARN)
-        ok = CKPT.exists()
+        ckpt = find_ckpt()
+        ok = ckpt is not None
         if ok:
             import torch as _t
-            ck = _t.load(CKPT, map_location="cpu", weights_only=False)
+            ck = _t.load(ckpt, map_location="cpu", weights_only=False)
             self._chip(self.chips_box,
                        f"модель · готова (IoU {ck.get('val_iou', 0):.4f})",
                        GOOD)
         else:
             self._chip(self.chips_box, "модель · не найдена", BAD)
         self._chip(self.chips_box,
-                   "демо-данные · есть" if Path("demo/demo_input").exists()
+                   "демо-данные · есть" if Path("demo_input").exists()
                    else "демо-данные · нет", GOOD if ok else WARN)
 
     def log(self, line: str):
@@ -352,7 +361,7 @@ class CloudApp(ctk.CTk):
         if not folder.exists():
             self.log(f"[!] Папка не найдена: {folder}")
             return
-        if not CKPT.exists():
+        if find_ckpt() is None:
             self.log("[!] Модель не найдена — обучите её: train.py")
             return
         thr = float(self.thr_slider.get())
@@ -375,7 +384,7 @@ class CloudApp(ctk.CTk):
         try:
             if self.model is None:
                 self.log("Загрузка модели…")
-                ckpt = torch.load(CKPT, map_location=self.device,
+                ckpt = torch.load(find_ckpt(), map_location=self.device,
                                   weights_only=False)
                 self.model, arch = build_model(ckpt.get("arch", "unet"),
                                                ckpt.get("encoder", "resnet18"),
